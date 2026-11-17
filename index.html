@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kaydirma Kumandasi</title>
+<style>
+html,body{margin:0;background:#111;color:#eee;font-family:-apple-system,Helvetica,sans-serif}
+a.big{display:block;margin:20px;padding:30px;background:#27a;color:#fff;
+ text-align:center;font-size:22px;border-radius:12px;text-decoration:none}
+#kumanda button{display:block;width:100%;height:50vh;border:0;color:#fff;
+ font-size:25vw;background:#2a7;-webkit-tap-highlight-color:transparent}
+#kumanda button.d{background:#27a}
+#kumanda button:active{opacity:.6}
+#bar{padding:12px;background:#222}
+#bar input{width:70%;font-size:16px;padding:8px}
+#bar button{font-size:16px;padding:8px 12px}
+#durum{font-size:13px;color:#8c8;margin-top:6px}
+iframe{display:block;width:100%;height:30000px;border:0;background:#fff}
+</style>
+</head>
+<body>
+<script>
+// Gizli isim adresin sonundaki #isim kisminden okunur (kodda saklanmaz).
+// Ornek: .../kaydirma/?m=alici#x8f3k29qmz  (iki telefonda ayni olmali)
+var SECRET = decodeURIComponent(location.hash.replace("#", ""));
+var TOPIC = "kaydir-" + SECRET;
+var STEP = 300;             // her basista kac piksel kaysin
+var BASE = "https://ntfy.sh/" + TOPIC;
+var mode = (location.search.match(/m=(\w+)/) || [])[1];
+
+function el(html) { var d = document.createElement("div"); d.innerHTML = html; return d; }
+
+if (SECRET.length < 8) {
+  document.body.appendChild(el(
+    '<p style="padding:20px;font-size:18px">Adresin sonuna en az 8 karakterlik gizli bir isim ekle.<br><br>' +
+    'Ornek:<br><b>?m=alici#x8f3k29qmz</b><br><b>?m=kumanda#x8f3k29qmz</b></p>'));
+} else if (mode === "kumanda") {
+  // ===== iPhone 6: kumanda =====
+  var k = el('<div id="kumanda"><button id="u">&#9650;</button><button id="d" class="d">&#9660;</button></div>');
+  document.body.appendChild(k);
+  function gonder(yon) {
+    var x = new XMLHttpRequest();
+    x.open("POST", BASE, true);
+    x.send(yon);
+  }
+  document.getElementById("u").onclick = function () { gonder("up"); };
+  document.getElementById("d").onclick = function () { gonder("down"); };
+
+} else if (mode === "alici") {
+  // ===== iPhone 11: alici =====
+  document.body.appendChild(el(
+    '<div id="bar"><input id="url" placeholder="https://site-adresi (istege bagli)">' +
+    ' <button id="ac">Ac</button><div id="durum">Baglaniyor...</div></div>' +
+    '<div id="icerik"></div>'));
+  var icerik = document.getElementById("icerik");
+  var durum = document.getElementById("durum");
+
+  // Test icerigi (adres girmezsen)
+  var test = "";
+  for (var i = 1; i <= 200; i++) test += "<p style='padding:0 16px;font-size:20px'>Test satiri " + i + "</p>";
+  icerik.innerHTML = test;
+
+  document.getElementById("ac").onclick = function () {
+    var u = document.getElementById("url").value.trim();
+    if (!u) return;
+    if (!/^https?:\/\//.test(u)) u = "https://" + u;
+    icerik.innerHTML = '<iframe src="' + u + '" scrolling="no"></iframe>';
+    window.scrollTo(0, 0);
+  };
+
+  var es = new EventSource(BASE + "/sse");
+  es.onopen = function () { durum.textContent = "Bagli, komut bekliyor"; };
+  es.onerror = function () { durum.textContent = "Baglanti kesildi, tekrar deniyor..."; };
+  es.onmessage = function (e) {
+    var d;
+    try { d = JSON.parse(e.data); } catch (err) { return; }
+    if (d.event !== "message") return;
+    if (d.message === "down") window.scrollBy(0, STEP);
+    if (d.message === "up") window.scrollBy(0, -STEP);
+  };
+
+} else {
+  // ===== secim ekrani =====
+  document.body.appendChild(el(
+    '<a class="big" href="?m=kumanda#' + SECRET + '">Kumanda (iPhone 6)</a>' +
+    '<a class="big" href="?m=alici#' + SECRET + '">Alici (iPhone 11)</a>'));
+}
+</script>
+</body>
+</html>
